@@ -42,3 +42,8 @@ services:
       - "9100:9100"
     depends_on:
       - kafka
+  processor:
+    container_name: processor
+    build: ./services/processor
+    depends_on:
+      - kafka

@@ -19,7 +19,6 @@ RUN CGO_ENABLED=0 go build -o ./out/agent .
 
 
 # --- The Final Image ---
-# Start with a minimal Alpine Linux image. This makes our final image very small.
 FROM alpine:latest
 
 # Set the working directory
