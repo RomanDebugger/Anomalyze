@@ -47,3 +47,9 @@ services:
     build: ./services/processor
     depends_on:
       - kafka
+      - ml-analyzer
+  ml-analyzer:
+    container_name: ml-analyzer
+    build: ./services/ml-analyzer
+    ports:
+      - "8000:8000"

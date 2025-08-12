@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"log"
+	"net/http"
 	"time"
 
 	"github.com/segmentio/kafka-go"
@@ -16,12 +18,36 @@ type MetricMessage struct {
 	MEM_Usage float64   `json:"mem_usage_percent"`
 }
 
-const (
-	windowSize = 6
-)
+type InferenceRequest struct {
+	Window []MetricMessage `json:"window"`
+}
+
+const windowSize = 6
+
+func callInferenceAPI(window []MetricMessage) {
+	url := "http://ml-analyzer:8000/infer"
+
+	requestBody := InferenceRequest{Window: window}
+	payload, err := json.Marshal(requestBody)
+	if err != nil {
+		log.Printf("Error marshalling inference request: %v", err)
+		return
+	}
+
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(payload))
+	if err != nil {
+		log.Printf("Error calling inference API: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	log.Printf("Inference API response status: %s", resp.Status)
+}
 
 func main() {
+	log.Println("Processor service starting... waiting 10 seconds for services to be ready.")
 	time.Sleep(10 * time.Second)
+
 	kafkaBroker := "kafka:29092"
 	topic := "metrics-raw"
 	groupID := "anomaly-processor-group"
@@ -35,31 +61,30 @@ func main() {
 	})
 	defer r.Close()
 
-	log.Println("Processor started, listening for messages on topic:", topic)
+	log.Println("Processor started, listening for messages...")
+
 	var currentWindow []MetricMessage
 
 	for {
 		m, err := r.ReadMessage(context.Background())
 		if err != nil {
-			log.Printf("Error while reading message: %v", err)
+			log.Printf("Error reading message: %v", err)
 			break
 		}
 
 		var msg MetricMessage
-		err = json.Unmarshal(m.Value, &msg)
-		if err != nil {
+		if err := json.Unmarshal(m.Value, &msg); err != nil {
 			log.Printf("Could not unmarshal message: %v", err)
 			continue
 		}
-		log.Printf("Parsed message for host %s: CPU=%.2f%%, MEM=%.2f%%", msg.Hostname, msg.CPU_Usage, msg.MEM_Usage)
+
 		currentWindow = append(currentWindow, msg)
+
 		if len(currentWindow) == windowSize {
-			log.Printf(">>>> Window is full with %d messages! Ready for analysis.", windowSize)
-			for _, metric := range currentWindow {
-				log.Printf("  - Host: %s, CPU: %.2f%%", metric.Hostname, metric.CPU_Usage)
-			}
+			log.Printf("Window is full. Sending to ML service for analysis...")
+			callInferenceAPI(currentWindow)
+
 			currentWindow = nil
-			log.Println(">>>> Window cleared.")
 		}
 	}
 }
