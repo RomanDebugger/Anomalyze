@@ -25,7 +25,6 @@ FROM alpine:latest
 WORKDIR /app
 
 # Copy ONLY the compiled binary from the 'builder' stage.
-# We don't need any of the source code or build tools.
 COPY --from=builder /app/out/agent .
 
 # Expose port 9100 to the network.
