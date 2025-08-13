@@ -1,7 +1,7 @@
 # The official Go image. This image contains all the tools needed to build our app.
 FROM golang:1.24-alpine AS builder
 
-# Set the working directory inside the container
+# Set the working directory inside the contain  maer
 WORKDIR /app
 
 # Copy the Go module files and download dependencies.

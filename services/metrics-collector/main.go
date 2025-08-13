@@ -35,8 +35,10 @@ type MetricMessage struct {
 }
 
 func recordMetrics(kafkaWriter *kafka.Writer) {
-	hostname, _ := os.Hostname()
-
+	hostname, err := os.Hostname()
+	if err != nil {
+		log.Fatalf("Failed to get hostname: %v", err)
+	}
 	go func() {
 		for {
 			cpuPercentages, err := cpu.Percent(time.Second, false)

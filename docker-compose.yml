@@ -5,6 +5,7 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+    restart: unless-stopped
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: kafka
@@ -19,6 +20,7 @@ services:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_CREATE_TOPICS: "metrics-raw:1:1"
+    restart: unless-stopped
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
@@ -35,6 +37,9 @@ services:
     container_name: grafana
     ports:
       - "3000:3000"
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning
+      - ./infra/grafana/dashboards:/etc/grafana/dashboards
   agent:
     container_name: agent
     build: ./services/metrics-collector
@@ -61,6 +66,12 @@ services:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
       POSTGRES_DB: anomalydb
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U user" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     ports:
       - "5433:5432"
     volumes:
