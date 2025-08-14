@@ -15,10 +15,15 @@ import (
 )
 
 type MetricMessage struct {
-	Hostname  string    `json:"hostname"`
-	Timestamp time.Time `json:"timestamp"`
-	CPU_Usage float64   `json:"cpu_usage_percent"`
-	MEM_Usage float64   `json:"mem_usage_percent"`
+	Hostname          string    `json:"hostname"`
+	Timestamp         time.Time `json:"timestamp"`
+	CPU_Usage         float64   `json:"cpu_usage_percent"`
+	MEM_Usage         float64   `json:"mem_usage_percent"`
+	Load_1            float64   `json:"load_1"`
+	Disk_Reads_PS     float64   `json:"disk_reads_ps"`
+	Disk_Writes_PS    float64   `json:"disk_writes_ps"`
+	Net_Sent_Bytes_PS float64   `json:"net_sent_bytes_ps"`
+	Net_Recv_Bytes_PS float64   `json:"net_recv_bytes_ps"`
 }
 
 type InferenceRequest struct {

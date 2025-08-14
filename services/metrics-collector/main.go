@@ -13,78 +13,91 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/segmentio/kafka-go"
 	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/disk"
+	"github.com/shirou/gopsutil/v3/load"
 	"github.com/shirou/gopsutil/v3/mem"
+	"github.com/shirou/gopsutil/v3/net"
 )
 
 var (
-	cpuUsage = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "node_cpu_usage_percent",
-		Help: "Current CPU usage percentage.",
-	})
-	memUsage = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "node_memory_usage_percent",
-		Help: "Current memory usage percentage.",
-	})
+	cpuUsage   = promauto.NewGauge(prometheus.GaugeOpts{Name: "node_cpu_usage_percent"})
+	memUsage   = promauto.NewGauge(prometheus.GaugeOpts{Name: "node_memory_usage_percent"})
+	load1      = promauto.NewGauge(prometheus.GaugeOpts{Name: "node_load1"})
+	diskReads  = promauto.NewGauge(prometheus.GaugeOpts{Name: "node_disk_reads_per_second"})
+	diskWrites = promauto.NewGauge(prometheus.GaugeOpts{Name: "node_disk_writes_per_second"})
+	netSent    = promauto.NewGauge(prometheus.GaugeOpts{Name: "node_net_sent_bytes_per_second"})
+	netRecv    = promauto.NewGauge(prometheus.GaugeOpts{Name: "node_net_recv_bytes_per_second"})
 )
 
 type MetricMessage struct {
-	Hostname  string    `json:"hostname"`
-	Timestamp time.Time `json:"timestamp"`
-	CPU_Usage float64   `json:"cpu_usage_percent"`
-	MEM_Usage float64   `json:"mem_usage_percent"`
+	Hostname          string    `json:"hostname"`
+	Timestamp         time.Time `json:"timestamp"`
+	CPU_Usage         float64   `json:"cpu_usage_percent"`
+	MEM_Usage         float64   `json:"mem_usage_percent"`
+	Load_1            float64   `json:"load_1"`
+	Disk_Reads_PS     float64   `json:"disk_reads_ps"`
+	Disk_Writes_PS    float64   `json:"disk_writes_ps"`
+	Net_Sent_Bytes_PS float64   `json:"net_sent_bytes_ps"`
+	Net_Recv_Bytes_PS float64   `json:"net_recv_bytes_ps"`
 }
 
 func recordMetrics(kafkaWriter *kafka.Writer) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		log.Fatalf("Failed to get hostname: %v", err)
-	}
+	hostname, _ := os.Hostname()
+	var lastNetCounters net.IOCountersStat
+	var lastDiskCounters disk.IOCountersStat
+	var lastTime time.Time
+
 	go func() {
 		for {
-			cpuPercentages, err := cpu.Percent(time.Second, false)
-			if err != nil {
-				log.Printf("Error getting CPU usage: %v", err)
-				continue
-			}
-			cpuVal := cpuPercentages[0]
+			currentTime := time.Now()
+			cpuVal, _ := cpu.Percent(time.Second, false)
+			memVal, _ := mem.VirtualMemory()
+			loadVal, _ := load.Avg()
+			netCounters, _ := net.IOCounters(false)
+			diskCounters, _ := disk.IOCounters()
 
-			vMem, err := mem.VirtualMemory()
-			if err != nil {
-				log.Printf("Error getting memory usage: %v", err)
-				continue
-			}
-			memVal := vMem.UsedPercent
-			cpuUsage.Set(cpuVal)
-			memUsage.Set(memVal)
+			if !lastTime.IsZero() {
+				duration := currentTime.Sub(lastTime).Seconds()
 
-			msg := MetricMessage{
-				Hostname:  hostname,
-				Timestamp: time.Now(),
-				CPU_Usage: cpuVal,
-				MEM_Usage: memVal,
+				diskReadRate := float64(diskCounters["sda"].ReadCount-lastDiskCounters.ReadCount) / duration
+				diskWriteRate := float64(diskCounters["sda"].WriteCount-lastDiskCounters.WriteCount) / duration
+				netSentRate := float64(netCounters[0].BytesSent-lastNetCounters.BytesSent) / duration
+				netRecvRate := float64(netCounters[0].BytesRecv-lastNetCounters.BytesRecv) / duration
+
+				cpuUsage.Set(cpuVal[0])
+				memUsage.Set(memVal.UsedPercent)
+				load1.Set(loadVal.Load1)
+				diskReads.Set(diskReadRate)
+				diskWrites.Set(diskWriteRate)
+				netSent.Set(netSentRate)
+				netRecv.Set(netRecvRate)
+
+				msg := MetricMessage{
+					Hostname:          hostname,
+					Timestamp:         currentTime,
+					CPU_Usage:         cpuVal[0],
+					MEM_Usage:         memVal.UsedPercent,
+					Load_1:            loadVal.Load1,
+					Disk_Reads_PS:     diskReadRate,
+					Disk_Writes_PS:    diskWriteRate,
+					Net_Sent_Bytes_PS: netSentRate,
+					Net_Recv_Bytes_PS: netRecvRate,
+				}
+				jsonMsg, _ := json.Marshal(msg)
+				kafkaWriter.WriteMessages(context.Background(), kafka.Message{Value: jsonMsg})
 			}
 
-			jsonMsg, err := json.Marshal(msg)
-			if err != nil {
-				log.Printf("Error marshalling JSON: %v", err)
-				continue
-			}
-
-			err = kafkaWriter.WriteMessages(context.Background(), kafka.Message{
-				Value: jsonMsg,
-			})
-			if err != nil {
-				log.Printf("Could not write message to kafka: %v", err)
-			} else {
-				log.Printf("Wrote message to Kafka: %s", string(jsonMsg))
-			}
-
-			time.Sleep(2 * time.Second)
+			lastNetCounters = netCounters[0]
+			lastDiskCounters = diskCounters["sda"]
+			lastTime = currentTime
+			time.Sleep(4 * time.Second)
 		}
 	}()
 }
-
 func main() {
+	log.Println("Agent service starting... waiting 15 seconds for Kafka to be ready.")
+	time.Sleep(15 * time.Second)
+
 	kafkaBroker := "kafka:29092"
 	topic := "metrics-raw"
 	writer := &kafka.Writer{
