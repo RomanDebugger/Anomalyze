@@ -7,7 +7,6 @@ An end-to-end, containerized observability + ML pipeline that ingests live syste
 
 Built with **Go, Python, Kafka, PyTorch, Prometheus, PostgreSQL, and Docker**.  
 
----
 
 ## 🚀 Key Highlights  
 
@@ -18,7 +17,6 @@ Built with **Go, Python, Kafka, PyTorch, Prometheus, PostgreSQL, and Docker**.
 - **Pre-Provisioned Dashboard** → Grafana automatically bootstrapped with dashboards + data sources.  
 - **Stress-Test Ready** → Generate CPU spikes via `stress-ng` and watch real-time anomaly detection kick in.  
 
----
 
 ## 🏗️ Architecture  
 
@@ -34,7 +32,6 @@ Anomalies → PostgreSQL → Grafana visualization.
   <img src="./docs/architecture.png" alt="Architecture" width="700">  
 </p>  
 
----
 
 ## ⚙️ Tech Stack  
 
@@ -47,7 +44,6 @@ Anomalies → PostgreSQL → Grafana visualization.
 - **Visualization:** Grafana  
 - **Infra/Orchestration:** Docker Compose  
 
----
 
 ## 📦 Quickstart  
 
@@ -67,7 +63,6 @@ docker compose logs -f ml-analyzer
 - **Grafana Dashboard:** http://localhost:3000 (user: `admin`, pass: `admin`)  
 - **Prometheus:** http://localhost:9090  
 
----
 
 ## 🧪 Testing Anomalies  
 
@@ -81,7 +76,6 @@ stress-ng --cpu 1 --timeout 60s
 
 ➡ Grafana will display a red anomaly marker during the spike. Event also logged in PostgreSQL.  
 
----
 
 ## 📂 Project Structure  
 
@@ -95,7 +89,7 @@ stress-ng --cpu 1 --timeout 60s
 └── docker-compose.yml    # Orchestration
 ```
 
----
 
 ## 📜 License  
 MIT  
+
