@@ -1,10 +1,37 @@
+import torch
+import pandas as pd
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List
-import pandas as pd
-import numpy as np
+import joblib
+from model import Autoencoder
+from sklearn.preprocessing import MinMaxScaler
 
-app = FastAPI()
+MODEL_PATH = "autoencoder_model.pth"
+SCALER_PATH = "scaler.joblib"
+THRESHOLD_PATH = "threshold.txt"
+N_FEATURES = 7
+
+app = FastAPI(title="Anomaly Detection Inference Server")
+
+try:
+    model = Autoencoder(n_features=N_FEATURES)
+    model.load_state_dict(torch.load(MODEL_PATH))
+    model.eval()
+    print("--- Autoencoder model loaded successfully! ---")
+
+    scaler = joblib.load(SCALER_PATH)
+    print("--- Data scaler loaded successfully! ---")
+
+    with open(THRESHOLD_PATH, "r") as f:
+        ANOMALY_THRESHOLD = float(f.read())
+    print(f"--- Anomaly threshold loaded: {ANOMALY_THRESHOLD:.6f} ---")
+
+except FileNotFoundError as e:
+    print(f"--- FATAL ERROR: Model, scaler, or threshold file not found. {e} ---")
+    model = None 
+    scaler = None
+    ANOMALY_THRESHOLD = 999
 
 class Metric(BaseModel):
     hostname: str
@@ -20,46 +47,29 @@ class Metric(BaseModel):
 class InferenceRequest(BaseModel):
     window: List[Metric]
 
-MODEL_STORE = {
-    "is_trained": False,
-    "training_data": pd.DataFrame(),
-    "training_windows_required": 10,
-    "mean": None,
-    "std_dev": None
-}
-ANOMALY_THRESHOLD = 3.5
-
 @app.post("/infer")
 def infer_anomaly(request: InferenceRequest):
+    if not model or not scaler:
+        return {"status": "error", "message": "Model or scaler not loaded."}
+
     df_window = pd.DataFrame([metric.model_dump() for metric in request.window])
-    numeric_cols = [col for col in df_window.columns if df_window[col].dtype in [np.float64, np.int64]]
-    if not MODEL_STORE["is_trained"]:
-        MODEL_STORE["training_data"] = pd.concat([MODEL_STORE["training_data"], df_window[numeric_cols]], ignore_index=True)
+    numeric_cols = [col for col in df_window.columns if df_window[col].dtype in ['float64', 'int64']]
 
-        num_windows_collected = len(MODEL_STORE["training_data"]) / len(df_window)
-        print(f"Collecting data for training... ({int(num_windows_collected)}/{MODEL_STORE['training_windows_required']})")
+    window_scaled = scaler.transform(df_window[numeric_cols])
+    window_tensor = torch.FloatTensor(window_scaled)
 
-        if num_windows_collected >= MODEL_STORE["training_windows_required"]:
-            MODEL_STORE["mean"] = MODEL_STORE["training_data"].mean()
-            MODEL_STORE["std_dev"] = MODEL_STORE["training_data"].std()
-            MODEL_STORE["is_trained"] = True
-            print("--- Multi-variate Model Training Complete! ---")
-            print("Mean values:\n", MODEL_STORE["mean"])
-            print("\nStd Dev values:\n", MODEL_STORE["std_dev"])
+    with torch.no_grad():
+        reconstructions = model(window_tensor)
 
-        return {"status": "training", "anomaly_score": 0, "is_anomaly": False}
+    mse_loss = torch.mean((window_tensor - reconstructions) ** 2, dim=1)
+    max_error = torch.max(mse_loss).item()
+    is_anomaly = max_error > ANOMALY_THRESHOLD
 
-    else:
-        std_devs = MODEL_STORE["std_dev"].replace(0, 1)
-        z_scores = (df_window[numeric_cols] - MODEL_STORE["mean"]) / std_devs
-        max_z_score = z_scores.abs().max().max()
+    print(f"Inference: Max reconstruction error = {max_error:.6f}, Is Anomaly = {is_anomaly}")
 
-        is_anomaly = max_z_score > ANOMALY_THRESHOLD
-        print(f"Inference: Max Z-score across all metrics = {max_z_score:.2f}, Is Anomaly = {is_anomaly}")
-
-        return {
-            "status": "success",
-            "anomaly_score": float(max_z_score),
-            "is_anomaly": bool(is_anomaly),
-            "model_version": "z-score-v2-multivariate"
-        }
+    return {
+        "status": "success",
+        "anomaly_score": float(max_error),
+        "is_anomaly": bool(is_anomaly),
+        "model_version": "autoencoder-v3-final"
+    }

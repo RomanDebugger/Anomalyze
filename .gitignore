@@ -1,0 +1,6 @@
+**/venv/
+
+services/ml-analyzer/training_data.csv
+services/ml-analyzer/autoencoder_model.pth
+services/ml-analyzer/scaler.joblib
+services/ml-analyzer/threshold.txt

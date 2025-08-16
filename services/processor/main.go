@@ -116,7 +116,8 @@ func callInferenceAPI(window []MetricMessage) {
 }
 
 func main() {
-	log.Println("Processor service starting...")
+	log.Println("Processor service starting... waiting 10 seconds for other services.")
+	time.Sleep(10 * time.Second)
 
 	initDB()
 	createAnomaliesTable()

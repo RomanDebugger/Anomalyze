@@ -59,6 +59,8 @@ services:
     build: ./services/ml-analyzer
     ports:
       - "8000:8000"
+    volumes:
+      - ml_analyzer_data:/app
   postgres:
     image: postgres:15
     container_name: postgres
@@ -79,3 +81,4 @@ services:
 
 volumes:
   postgres_data:
+  ml_analyzer_data:
