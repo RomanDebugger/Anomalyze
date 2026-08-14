@@ -1,4 +1,4 @@
-# 📡 Real-time Anomaly Detection for Distributed Systems  
+# Real-time Anomaly Detection for Distributed Systems  
 
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen)  
 ![License](https://img.shields.io/badge/license-MIT-blue)  
@@ -8,7 +8,7 @@ An end-to-end, containerized observability + ML pipeline that ingests live syste
 Built with **Go, Python, Kafka, PyTorch, Prometheus, PostgreSQL, and Docker**.  
 
 
-## 🚀 Key Highlights  
+## Key Highlights  
 
 - **Dual-Pipeline Architecture** → Metrics flow into both Prometheus (live monitoring) and Kafka (stream analysis).  
 - **Automated MLOps Workflow** → Auto-collects data, trains a PyTorch Autoencoder, calibrates thresholds, and persists artifacts.  
@@ -18,7 +18,7 @@ Built with **Go, Python, Kafka, PyTorch, Prometheus, PostgreSQL, and Docker**.
 - **Stress-Test Ready** → Generate CPU spikes via `stress-ng` and watch real-time anomaly detection kick in.  
 
 
-## 🏗️ Architecture  
+## Architecture  
 
 The system is structured as **three microservices** running in Docker Compose:  
 
@@ -33,7 +33,7 @@ Anomalies → PostgreSQL → Grafana visualization.
 </p>  
 
 
-## ⚙️ Tech Stack  
+## Tech Stack  
 
 - **Data Collection:** Go (`gopsutil`)  
 - **Streaming:** Apache Kafka  
@@ -45,7 +45,7 @@ Anomalies → PostgreSQL → Grafana visualization.
 - **Infra/Orchestration:** Docker Compose  
 
 
-## 📦 Quickstart  
+## Quickstart  
 
 ```bash
 # 1. Clone the repo
@@ -77,7 +77,7 @@ stress-ng --cpu 1 --timeout 60s
 ➡ Grafana will display a red anomaly marker during the spike. Event also logged in PostgreSQL.  
 
 
-## 📂 Project Structure  
+## Project Structure  
 
 ```
 .
@@ -90,6 +90,6 @@ stress-ng --cpu 1 --timeout 60s
 ```
 
 
-## 📜 License  
+## License  
 MIT  
 
